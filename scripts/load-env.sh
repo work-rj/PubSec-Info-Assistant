@@ -12,7 +12,7 @@ sudo chmod 666 /var/run/docker.sock
 
 #Ensure hw time sync is enabled to avoid time drift when the host OS sleeps. 
 #Time sync is required else Azure authentication tokens will be invalid
-source "${ENV_DIR}/time-sync.sh"
+#source "${ENV_DIR}/time-sync.sh"
 
 # Default values - you can override these in your environment.env
 # -------------------------------------------------------------------------------------------------------

@@ -5,8 +5,8 @@ param buildNumber string = '1.0.0'
 
 param createResourceGroup bool = true
 param resourceGroupName string = ''
-param location string = 'eastus'
-
+param location string = 'westus2'
+param azure_environment string = 'AzureCloud'
 @minLength(1)
 @maxLength(64)
 @description('Name of the the environment which is used to generate a short unique hash used in all resources.')
@@ -66,6 +66,27 @@ param chatHistoryVersion string = 'cosmosdb-v2'
 param documentIntelligenceServiceName string = '' // Set in main.parameters.json
 param documentIntelligenceResourceGroupName string = '' // Set in main.parameters.json
 
+param chunkTargetSize string = '750' // Set in main.parameters.json
+param targetPages string  // Set in main.parameters.json
+param formRecognizerApiVersion string // Set in main.parameters.json
+param queryTermLanguage string // Set in main.parameters.json
+param maxSubmitRequeueCount int // Set in main.parameters.json
+param pollQueueSubmitBackoff int // Set in main.parameters.json
+param pdfSubmitQueueBackoff int // Set in main.parameters.json
+param maxPollingRequeueCount int // Set in main.parameters.json
+param submitRequeueHideSeconds int // Set in main.parameters.json
+param pollingBackoff int // Set in main.parameters.json
+param maxReadAttempts int // Set in main.parameters.json
+param maxEnrichmentRequeueCount int // Set in main.parameters.json
+param enrichmentBackoff int // Set in main.parameters.json
+param targetTranslationLanguage string // Set in main.parameters.json
+param pdfSubmitQueue string // Set in main.parameters.json
+param pdfPollingQueue string // Set in main.parameters.json
+param nonPdfSubmitQueue string // Set in main.parameters.json
+param mediaSubmitQueue string // Set in main.parameters.json
+param textEnrichmentQueue string // Set in main.parameters.json
+param imageEnrichmentQueue string // Set in main.parameters.json
+param embeddingsQueue string // Set in main.parameters.json
 // Limited regions for new version:
 // https://learn.microsoft.com/azure/ai-services/document-intelligence/concept-layout
 @description('Location for the Document Intelligence resource group')
@@ -83,7 +104,7 @@ param cognitiveServiceResourceGroupName string = '' // Set in main.parameters.js
 
 // Limited regions for new version:
 // https://learn.microsoft.com/azure/ai-services/document-intelligence/concept-layout
-@description('Location for the Document Intelligence resource group')
+@description('Location for the Cognitive services resource group')
 @allowed(['eastus', 'westus2', 'westeurope'])
 @metadata({
   azd: {
@@ -210,7 +231,7 @@ param subnetBackendAddressPrefix string = '10.0.1.0/24'
 param subnetAppIntAddressPrefix string = '10.0.2.0/24'
 param subnetFuncIntAddressPrefix string = '10.0.3.0/24'
 param subnetEnrichIntAddressPrefix string = '10.0.4.0/24'
-
+param azure_ai_private_link_domain string = ''
 param allowedIps string = ''
 
 @allowed(['None', 'AzureServices'])
@@ -762,22 +783,27 @@ module webapp 'core/host/appservice.bicep' = if (deploymentTarget == 'appservice
   }
 }
 
-module functionServicePlan 'core/host/appserviceplan.bicep' = {
-  name: 'functionserviceplan'
-  scope: mainResourceGroup
-  params: {
-    name: !empty(functionServicePlanName) ? functionServicePlanName : '${abbrs.webServerFarms}func-${resourceToken}'
-    location: location
-    tags: tags
-    aseId: functionServiceAseId
-    sku: {
-      name: functionServiceSkuName
-      capacity: 1
-      tier: functionServiceSkuTier
-    }
-    kind: 'linux'
-  }
-}
+// Use backendPlan for the function app service plan instead of a separate functionServicePlan
+var functionServicePlan = backendPlan
+
+
+// module functionServicePlan 'core/host/appserviceplan.bicep' = {
+//  name: 'functionserviceplan'
+//  scope: mainResourceGroup
+//  params: {
+//    name: !empty(functionServicePlanName) ? functionServicePlanName : '${abbrs.webServerFarms}func-${resourceToken}'
+//    location: location
+//    tags: tags
+//    aseId: functionServiceAseId
+//    sku: {
+//      name: functionServiceSkuName
+//      capacity: 1
+//      tier: functionServiceSkuTier
+//    }
+//    kind: 'linux'
+//  }
+//}
+
 
 module functionStorage 'core/storage/storage-account.bicep' = {
   name: 'function-storage'
@@ -807,12 +833,13 @@ module functionStorage 'core/storage/storage-account.bicep' = {
   }
 }
 
+
 module function 'br/public:avm/res/web/site:0.15.1' = {
   name: 'function'
   scope: mainResourceGroup
   params: {
     // Required parameters
-    kind: 'app,linux,container'
+    kind: 'functionapp'
     tags: union(tags, { 'azd-service-name': 'function' })
     name: !empty(functionServiceName) ? functionServiceName : '${abbrs.webSitesFunctions}${resourceToken}'
     serverFarmResourceId: functionServicePlan.outputs.id
@@ -868,17 +895,17 @@ module function 'br/public:avm/res/web/site:0.15.1' = {
       SUBMIT_REQUEUE_HIDE_SECONDS                 : submitRequeueHideSeconds
       POLLING_BACKOFF                             : pollingBackoff
       MAX_READ_ATTEMPTS                           : maxReadAttempts
+      ENRICHMENT_ENDPOINT                         : enrichmentApp.outputs.defaultHostname
+      ENRICHMENT_NAME                             : enrichmentApp.outputs.name
+      ENRICHMENT_LOCATION                         : location
       AZURE_AI_KEY                                : ''
-      AZURE_AI_ENDPOINT                           : enrichmentEndpoint
-      ENRICHMENT_NAME                             : enrichmentName
-      AZURE_AI_LOCATION                           : enrichmentLocation
       TARGET_TRANSLATION_LANGUAGE                 : targetTranslationLanguage
       MAX_ENRICHMENT_REQUEUE_COUNT                : maxEnrichmentRequeueCount
       ENRICHMENT_BACKOFF                          : enrichmentBackoff
-      EMBEDDINGS_QUEUE                            : EMBEDDINGS_QUEUE
-      AZURE_SEARCH_SERVICE_ENDPOINT               : azureSearchServiceEndpoint
-      AZURE_SEARCH_INDEX                          : azureSearchIndex
-      AZURE_AI_CREDENTIAL_DOMAIN                  : azure_ai_credential_domain
+      EMBEDDINGS_QUEUE                            : embeddingsQueue
+      AZURE_SEARCH_SERVICE_ENDPOINT               : searchService.outputs.endpoint
+      AZURE_SEARCH_INDEX                          : searchIndexName
+      AZURE_AI_CREDENTIAL_DOMAIN                  : azure_ai_private_link_domain
       AZURE_OPENAI_AUTHORITY_HOST                 : azure_environment
       LOCAL_DEBUG                                 : string(false)
     }

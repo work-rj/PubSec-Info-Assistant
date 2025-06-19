@@ -24,11 +24,13 @@ ENRICHMENT_ROOT_PATH="${DIR}/..//app/enrichment"
 rm -rf ${BINARIES_OUTPUT_PATH} && mkdir -p ${BINARIES_OUTPUT_PATH}
 
 #Build the AzLib that contains the JavaScript functions that enable the upload feature
+echo "Build frontend"
 cd app/frontend
 npm install
 npm run build
 
 # copy the shared_code files from functions to the webapp
+echo "Copy shared code"
 cd ../backend
 mkdir -p ./shared_code
 cp  -u ../../functions/shared_code/status_log.py ./shared_code
@@ -37,6 +39,7 @@ cd $DIR
 
 # zip the enrichment app content from app/enrichments to the .artifacts folders
 cd ${ENRICHMENT_ROOT_PATH}
+echo "Build enrichment app content"
 mkdir -p ./shared_code
 cp  -u ../../functions/shared_code/status_log.py ./shared_code
 cp  -u ../../functions/shared_code/utilities_helper.py ./shared_code
